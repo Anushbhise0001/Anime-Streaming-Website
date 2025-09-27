@@ -1,47 +1,33 @@
 import os
 from flask import Flask, jsonify
-import psycopg2
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-# --- Database Connection Test ---
-# Ye 'DATABASE_URL' environment variable ko use karega
-# jo humne Render par set ki hai (aur local test ke liye bhi set kar sakte hain).
+# Render me DATABASE_URL env variable milega
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL").replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-def get_db_connection():
-    # Attempt to connect using the DATABASE_URL environment variable
-    conn = psycopg2.connect(os.environ.get('postgresql://animewebdb_user:0SA7G3HdMiNBuxLhtdDjPwI1TJAJffKo@dpg-d3b9b46r433s738hkbhg-a/animewebdb'))
-    return conn
+db = SQLAlchemy(app)
 
-@app.route('/')
+# Example model
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+
+# Default route
+@app.route("/")
 def home():
-    # Ye ek basic JSON response dega
-    return jsonify({
-        'status': 'OK',
-        'message': 'Backend is running successfully!',
-        'database_check': 'Not checked on this route, but setup is ready.'
-    })
+    return jsonify({"msg": "Earner with SM Backend Running with DB!"})
 
-@app.route('/health')
-def health_check():
-    # Database connection test
+# Test DB route
+@app.route("/testdb")
+def testdb():
     try:
-        conn = get_db_connection()
-        conn.close()
-        return jsonify({
-            'status': 'Healthy',
-            'database': 'PostgreSQL connected successfully!'
-        }), 200
+        db.session.execute("SELECT 1")
+        return jsonify({"msg": "DB Connected Successfully!"})
     except Exception as e:
-        # Agar connection fail hua toh error message
-        return jsonify({
-            'status': 'Error',
-            'database': 'PostgreSQL connection failed.',
-            'error_details': str(e)
-        }), 500
+        return jsonify({"error": str(e)})
 
-
-if __name__ == '__main__':
-    # Jab Render par deploy hoga, toh Gunicorn isko chalayega.
-    # Hum local test ke liye isko use kar sakte hain.
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
